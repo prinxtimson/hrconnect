@@ -1,6 +1,5 @@
 import express from "express";
 import dialogflow from "@google-cloud/dialogflow";
-import { google } from "googleapis";
 import cors from "cors";
 import dotenv from "dotenv";
 
@@ -97,7 +96,11 @@ app.post("/api/chat", async (req, res) => {
 //   }
 // });
 
-// Start the server
-app.listen(port, () => {
-  console.log(`Example app listening at http://localhost:${port}`);
-});
+if (process.env.APP_ENV == "local") {
+  // Start the server
+  app.listen(port, () => {
+    console.log(`Example app listening at http://localhost:${port}`);
+  });
+}
+
+export default app;
