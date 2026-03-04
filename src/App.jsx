@@ -17,7 +17,7 @@ import ResetPassword from "./pages/ResetPassword";
 import { searchLeaveBalance } from "./lib/appwrite";
 
 const App = () => {
-  const [options, setOptions] = useState([]);
+  const [options, setOptions] = useState(["Annual leave"]);
   const [sessionId] = useState(crypto.randomUUID());
 
   const { isAuthenticated, user } = useSelector((state) => state.auth);
@@ -35,7 +35,7 @@ const App = () => {
       path: "loop",
     },
     loop: {
-      message: async (params) => {
+      options: async (params) => {
         const userMessage = params.userInput;
         let botResponse = "";
 
@@ -48,30 +48,31 @@ const App = () => {
 
           const data = await response.json();
           if (data.error) return data.error;
-          let optionsArr = data
-            .find((val) => val.message == "payload")
-            .payload.fields.richContent.structValue.fields.options.listValue.values.map(
-              (val) => val.structValue.fields.text.stringValue,
-            );
-          setOptions(optionsArr);
+          let optionsArr =
+            data
+              .find((val) => val.message == "payload")
+              ?.payload?.fields?.richContent.listValue.values[0]?.structValue.fields.options.listValue.values.map(
+                (val) => val.structValue.fields.text.stringValue,
+              ) || [];
+
           data
             .filter((val) => val.message == "text")
             .map((msg) => {
               botResponse = botResponse + `${msg.text.text[0]}\n`;
             });
 
-          return botResponse;
+          await params.injectMessage(botResponse);
+
+          return optionsArr;
         } catch (error) {
           console.error("Chat Error:", error);
           return "Sorry, I'm having trouble connecting to the chat service.";
         }
       },
-      options: options,
-      path: (params) => {
-        if (params.userInput === "Annual leave") return "leave_balance";
-        if (params.userInput === "Sick Leave") return "leave_balance";
-        if (params.userInput === "Maternity/Paternity Leave")
-          return "leave_balance";
+      path: () => {
+        if (userMessage === "Annual leave") return "leave_balance";
+        if (userMessage === "Sick Leave") return "leave_balance";
+        if (userMessage === "Maternity/Paternity Leave") return "leave_balance";
         return "loop";
       },
     },
