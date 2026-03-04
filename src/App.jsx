@@ -36,6 +36,7 @@ const App = () => {
       path: "loop",
     },
     loop: {
+      message: "",
       options: async (params) => {
         const userMessage = params.userInput;
         let botResponse = "";
@@ -73,10 +74,11 @@ const App = () => {
           return [];
         }
       },
-      path: () => {
-        if (userMessage === "Annual leave") return "leave_balance";
-        if (userMessage === "Sick Leave") return "leave_balance";
-        if (userMessage === "Maternity/Paternity Leave") return "leave_balance";
+      path: (params) => {
+        if (params.userInput === "Annual leave") return "leave_balance";
+        if (params.userInput === "Sick Leave") return "leave_balance";
+        if (params.userInput === "Maternity/Paternity Leave")
+          return "leave_balance";
         return "loop";
       },
     },
