@@ -16,8 +16,9 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import { searchLeaveBalance } from "./lib/appwrite";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+
 const App = () => {
-  const [options, setOptions] = useState(["Annual leave"]);
   const [sessionId] = useState(crypto.randomUUID());
 
   const { isAuthenticated, user } = useSelector((state) => state.auth);
@@ -40,7 +41,7 @@ const App = () => {
         let botResponse = "";
 
         try {
-          const response = await fetch("/api/chat", {
+          const response = await fetch(`${API_URL}/api/chat`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ message: userMessage, sessionId }),
