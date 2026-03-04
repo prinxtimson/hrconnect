@@ -96,11 +96,9 @@ app.post("/api/chat", async (req, res) => {
 //   }
 // });
 
-if (process.env.APP_ENV == "local") {
-  // Start the server
-  app.listen(port, () => {
-    console.log(`Example app listening at http://localhost:${port}`);
-  });
-}
+// Start the server
+app.listen(port, () => {
+  console.log(`Example app listening at http://localhost:${port}`);
+});
 
 export default app;

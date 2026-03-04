@@ -66,7 +66,10 @@ const App = () => {
           return optionsArr;
         } catch (error) {
           console.error("Chat Error:", error);
-          return "Sorry, I'm having trouble connecting to the chat service.";
+          await params.injectMessage(
+            "Sorry, I'm having trouble connecting to the chat service.",
+          );
+          return [];
         }
       },
       path: () => {
