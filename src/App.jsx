@@ -53,8 +53,8 @@ const App = () => {
           let optionsArr =
             data
               .find((val) => val.message == "payload")
-              ?.payload?.fields?.richContent.listValue.values[0]?.structValue.fields.options.listValue.values.map(
-                (val) => val.structValue.fields.text.stringValue,
+              ?.payload?.fields?.options.listValue.values.map(
+                (val) => val.stringValue,
               ) || [];
 
           data
