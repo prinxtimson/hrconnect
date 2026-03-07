@@ -12,18 +12,18 @@ export const getAllLeaveApplication = async () => {
   const res = await tablesDB.listRows({
     databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID,
     tableId: "leaveapplications",
+    queries: [Query.select(["*", "user.*", "admin.*"])],
   });
 
   return res;
 };
 
 export const searchLeaveBalance = async (data) => {
-  console.log(data);
   const res = await tablesDB.listRows({
     databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID,
     tableId: "leavebalances",
     queries: [
-      Query.equal("employeeId", data.userId),
+      Query.equal("user", data.userId),
       Query.equal("leaveType", data.leaveType),
     ],
   });
@@ -69,7 +69,7 @@ export const approveLeaveApplication = async (data) => {
     databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID,
     tableId: "leavebalances",
     queries: [
-      Query.equal("employeeId", res.employeeId), // Specify which rows to update
+      Query.equal("user", res.userId), // Specify which rows to update
       Query.equal("leaveType", res.leaveType),
     ],
   });

@@ -11,12 +11,12 @@ const CustomSidebar = ({ user, customClass }) => {
       label: "Dashboard",
       link: "/dashboard",
     },
-    // {
-    //   id: "LEAVE",
-    //   icon: "fa-address-book",
-    //   label: "Leave Management",
-    //   link: "/dashboard/leave-management",
-    // },
+    {
+      id: "LEAVE",
+      icon: "fa-address-book",
+      label: "Leave Management",
+      link: "/dashboard/leave-management",
+    },
   ];
 
   return (
@@ -41,7 +41,7 @@ const CustomSidebar = ({ user, customClass }) => {
                 : "hover:bg-slate-800 hover:text-white"
             }`}
           >
-            <i className={`fas ${item.icon} w-5`}></i>
+            {/* <i className={`fas ${item.icon} w-5`}></i> */}
             <span className="font-medium">{item.label}</span>
           </Link>
         ))}

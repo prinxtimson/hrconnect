@@ -51,15 +51,16 @@ const Header = () => {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <div className="flex items-center space-x-8">
-                <Link
-                  to="/dashboard"
-                  className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors"
-                >
-                  Dashboard
-                </Link>
-              </div>
-
+              {isAuthenticated && (
+                <div className="flex items-center space-x-8">
+                  <Link
+                    to="/dashboard"
+                    className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors"
+                  >
+                    Dashboard
+                  </Link>
+                </div>
+              )}
               {isAuthenticated ? (
                 <div
                   className="flex px-2 py-1.5 gap-2 items-center cursor-pointer shadow rounded-md bg-white"

@@ -7,8 +7,10 @@ import { Button } from "primereact/button";
 import { Dropdown } from "primereact/dropdown";
 import { IconField } from "primereact/iconfield";
 import { InputIcon } from "primereact/inputicon";
+import { SquarePen, Trash } from "lucide-react";
 import { Column } from "primereact/column";
 import { Avatar } from "primereact/avatar";
+import { Tag } from "primereact/tag";
 import moment from "moment";
 
 import MainContainer from "../../layouts/MainContainer";
@@ -33,7 +35,7 @@ const index = () => {
       setTotal(res.total);
       setIsLoading(false);
     } catch (error) {
-      setError(error);
+      setError(error.message);
       setIsLoading(false);
     }
   };
@@ -45,9 +47,8 @@ const index = () => {
         summary: "Error",
         detail: error,
         life: 3000,
+        onHide: () => setError(null),
       });
-
-      toastRef.current.onHide(() => setError(null));
     }
   }, [error]);
 
@@ -67,18 +68,34 @@ const index = () => {
     }
   };
 
+  const getLeaveType = (type) => {
+    switch (type) {
+      case "sickLeave":
+        return "Sick Leave";
+
+      case "annualLeave":
+        return "Annual Leave";
+
+      case "casualLeave":
+        return "Casual Leave";
+
+      case "maternityLeave":
+        return "Maternity Leave";
+    }
+  };
+
   const actionBodyTemplate = (rowData) => {
     return (
       <div className="flex gap-1 items-center text-[#f8fafc]">
         <button
-          onClick={(e) => navigate(`edit/${rowData.id}`)}
+          onClick={(e) => navigate(`#`)}
           className="w-10 h-10 rounded-full bg-slate-500 flex items-center justify-center hover:bg-slate-400"
           title="Edit"
         >
-          <i className="fa-solid fa-pencil text-sm"></i>
+          <SquarePen />
         </button>
 
-        <button
+        {/* <button
           onClick={() => {
             if (
               window.confirm(`You are about to delete this user are you sure?`)
@@ -88,10 +105,14 @@ const index = () => {
           className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center hover:bg-red-500"
           title="Delete"
         >
-          <i className="fa-solid fa-trash text-sm"></i>
-        </button>
+          <Trash />
+        </button> */}
       </div>
     );
+  };
+
+  const leaveTypeBodyTemplate = (rowData) => {
+    return <div className="">{getLeaveType(rowData.leaveType)}</div>;
   };
 
   const statusBodyTemplate = (rowData) => {
@@ -100,21 +121,23 @@ const index = () => {
     );
   };
 
-  const dateBodyTemplate = (date) => (
-    <div className="">{moment(date).format("ll")}</div>
-  );
+  const dateBodyTemplate = (date) => {
+    if (date) {
+      return <div className="">{moment(date).format("ll")}</div>;
+    }
+    return;
+  };
 
-  const userBodyTemplate = (rowData) => {
-    const employee = rowData.representative;
-
+  const userBodyTemplate = (user) => {
+    if (!user || !user.name) return;
     return (
       <div className="flex align-items-center gap-2">
         <Avatar
-          label={`${employee?.name.split(" ")[0].charAt(0)}${employee?.name.split(" ")[1].charAt(0)}`}
+          label={`${user?.name?.split(" ")[0]?.charAt(0)}${user?.name?.split(" ")[1]?.charAt(0)}`}
           shape="circle"
           style={{ backgroundColor: "#6a008e", color: "#ffffff" }}
         />
-        <span>{employee.name}</span>
+        <span>{user?.name}</span>
       </div>
     );
   };
@@ -131,33 +154,35 @@ const index = () => {
             loading={isLoading}
             breakpoint="0px"
             tableStyle={{ minWidth: "50rem" }}
-            dataKey="id"
+            dataKey="$id"
             stripedRows
-            header={header}
+            //header={header}
           >
-            <Column field="id" header="ID"></Column>
+            <Column field="$id" header="ID"></Column>
             <Column
               field="name"
-              header="Employee Name"
-              body={userBodyTemplate}
+              header="Name"
+              style={{ minWidth: "10rem" }}
+              body={(row) => userBodyTemplate(row.user)}
             ></Column>
             <Column
               field="leaveType"
               header="Leave Type"
               align="center"
               style={{ minWidth: "10rem" }}
+              body={leaveTypeBodyTemplate}
             ></Column>
             <Column
               field="startDate"
               header="Start Date"
-              align="center"
               style={{ minWidth: "10rem" }}
+              body={(row) => dateBodyTemplate(row.startDate)}
             ></Column>
             <Column
-              field="leaveType"
-              header="Leave Type"
-              align="center"
+              field="endDate"
+              header="End Date"
               style={{ minWidth: "10rem" }}
+              body={(row) => dateBodyTemplate(row.endDate)}
             ></Column>
             <Column
               field="status"
@@ -174,7 +199,7 @@ const index = () => {
               header="Approve By"
               align="center"
               style={{ minWidth: "10rem" }}
-              body={userBodyTemplate}
+              body={(row) => userBodyTemplate(row.admin)}
             ></Column>
             <Column
               field="comment"
@@ -182,17 +207,17 @@ const index = () => {
               style={{ minWidth: "10rem" }}
             ></Column>
             <Column
-              field="approvalDate"
+              field="approveAt"
               header="Approve At"
               align="center"
               style={{ minWidth: "10rem" }}
-              body={(row) => dateBodyTemplate(row.approvalDate)}
+              body={(row) => dateBodyTemplate(row.approveAt)}
             ></Column>
             <Column
               field="createdAt"
               header="Submitted At"
               style={{ minWidth: "10rem" }}
-              body={(row) => dateBodyTemplate(row.createdAt)}
+              body={(row) => dateBodyTemplate(row.$createdAt)}
             ></Column>
             <Column header="Action" body={actionBodyTemplate}></Column>
           </DataTable>

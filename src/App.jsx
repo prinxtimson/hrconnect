@@ -93,13 +93,24 @@ const App = () => {
       },
       function: (params) => {
         if (params.userInput == "Submit Leave Request") {
-          updateForm({ employeeId: user.id, status: "pending" });
+          updateForm({ user: user.$id, status: "pending" });
         }
       },
       path: (params) => {
-        if (params.userInput == "Annual Leave") return "leave_balance";
-        if (params.userInput == "Sick Leave") return "leave_balance";
-        if (params.userInput == "Maternity/Paternity Leave")
+        if (
+          params.userInput.toLowerCase().match("annual leave") &&
+          params.prevPath == "loop"
+        )
+          return "leave_balance";
+        if (
+          params.userInput.toLowerCase().match("sick leave") &&
+          params.prevPath == "loop"
+        )
+          return "leave_balance";
+        if (
+          params.userInput.toLowerCase().match("maternity/paternity leave") &&
+          params.prevPath == "loop"
+        )
           return "leave_balance";
         if (params.userInput == "Submit Leave Request") return "book_leave";
         return "loop";
@@ -109,7 +120,7 @@ const App = () => {
       message: async (params) => {
         const userMessage = lowercaseFirstLetter(params.userInput);
         let botResponse = "";
-        //console.log(userMessage);
+
         try {
           const { rows } = await searchLeaveBalance({
             userId: user.$id,
@@ -127,33 +138,35 @@ const App = () => {
           return "Sorry, I'm having trouble connecting to the chat service.";
         }
       },
-      options: (params) => [`Book Leave`, "Return to Main Menu"],
+      options: (params) => [`Submit Leave Request`, "Return to Main Menu"],
       function: (params) => {
-        if (params.userInput == `Book Leave`) {
-          updateForm({ employeeId: user.$id, status: "pending" });
+        if (params.userInput == `Submit Leave Request`) {
+          updateForm({ user: user.$id, status: "pending" });
         }
       },
       path: (params) => {
-        console.log(params.userInput);
-        if (params.userInput == `Book Leave`) return "book_leave";
+        if (params.userInput == `Submit Leave Request`) return "book_leave";
         return "loop";
       },
     },
     book_leave: {
       message: "Please select from the category below",
-      options: ["Annual leave", "Sick Leave", "Maternity/Paternity Leave"],
+      options: ["Annual Leave", "Sick Leave", "Maternity/Paternity Leave"],
       function: (params) =>
         updateForm({ leaveType: lowercaseFirstLetter(params.userInput) }),
       path: (params) => {
-        if (params.userInput == "Annual Leave") return "ask_start";
-        if (params.userInput == "Sick Leave") return "ask_start";
-        if (params.userInput == "Maternity/Paternity Leave") return "ask_start";
+        if (params.userInput.toLowerCase().match("annual leave"))
+          return "ask_start";
+        if (params.userInput.toLowerCase().match("sick leave"))
+          return "ask_start";
+        if (params.userInput.toLowerCase().match("maternity/paternity leave"))
+          return "ask_start";
         return "loop";
       },
     },
     ask_start: {
       message: "Please enter your start date (Format: YYYY-MM-DD",
-      function: () => updateForm({ startDate: params.userInput }),
+      function: (params) => updateForm({ startDate: params.userInput }),
       path: async (params) => {
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
         if (!dateRegex.test(params.userInput)) {
@@ -174,7 +187,7 @@ const App = () => {
     },
     ask_end: {
       message: "Please enter your end date (Format: YYYY-MM-DD",
-      function: () => updateForm({ startDate: params.userInput }),
+      function: (params) => updateForm({ endDate: params.userInput }),
       path: async (params) => {
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
         if (!dateRegex.test(params.userInput)) {
