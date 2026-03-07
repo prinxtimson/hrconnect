@@ -8,13 +8,23 @@ client
 export const account = new Account(client);
 export const tablesDB = new TablesDB(client);
 
-export const searchLeaveBalance = async ({ userId, leaveType }) => {
+export const getAllLeaveApplication = async () => {
+  const res = await tablesDB.listRows({
+    databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID,
+    tableId: "leaveapplications",
+  });
+
+  return res;
+};
+
+export const searchLeaveBalance = async (data) => {
+  console.log(data);
   const res = await tablesDB.listRows({
     databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID,
     tableId: "leavebalances",
     queries: [
-      Query.equal("employeeId", userId),
-      Query.equal("leaveType", leaveType),
+      Query.equal("employeeId", data.userId),
+      Query.equal("leaveType", data.leaveType),
     ],
   });
 

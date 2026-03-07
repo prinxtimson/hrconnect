@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import ChatBot from "react-chatbotify";
@@ -6,6 +6,7 @@ import ChatBot from "react-chatbotify";
 import "./App.css";
 
 import { getCurrentUser } from "./features/auth/authSlice";
+import { searchLeaveBalance, submitLeaveApplication } from "./lib/appwrite";
 
 import GuestRoute from "./utils/GuestRoute";
 import AuthRoute from "./utils/AuthRoute";
@@ -14,12 +15,19 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
-import { searchLeaveBalance } from "./lib/appwrite";
+import Dashboard from "./pages/Dashboard";
+import LeaveManagement from "./pages/LeaveManagement";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 const App = () => {
   const [sessionId] = useState(crypto.randomUUID());
+  const formRef = useRef({});
+
+  // simple helper to update form
+  const updateForm = (patch) => {
+    Object.assign(formRef.current, patch);
+  };
 
   const { isAuthenticated, user } = useSelector((state) => state.auth);
 
@@ -28,6 +36,15 @@ const App = () => {
   useEffect(() => {
     dispatch(getCurrentUser());
   }, []);
+
+  function lowercaseFirstLetter(str) {
+    if (!str || typeof str !== "string") {
+      return ""; // Handle empty or non-string inputs gracefully
+    }
+    str = str.replaceAll(" ", "");
+    str = str.replace("/Paternity", "");
+    return str.charAt(0).toLowerCase() + str.slice(1);
+  }
 
   const flow = {
     start: {
@@ -74,28 +91,34 @@ const App = () => {
           return [];
         }
       },
+      function: (params) => {
+        if (params.userInput == "Submit Leave Request") {
+          updateForm({ employeeId: user.id, status: "pending" });
+        }
+      },
       path: (params) => {
-        if (params.userInput === "Annual leave") return "leave_balance";
-        if (params.userInput === "Sick Leave") return "leave_balance";
-        if (params.userInput === "Maternity/Paternity Leave")
+        if (params.userInput == "Annual Leave") return "leave_balance";
+        if (params.userInput == "Sick Leave") return "leave_balance";
+        if (params.userInput == "Maternity/Paternity Leave")
           return "leave_balance";
+        if (params.userInput == "Submit Leave Request") return "book_leave";
         return "loop";
       },
     },
     leave_balance: {
       message: async (params) => {
-        const userMessage = params.userInput;
+        const userMessage = lowercaseFirstLetter(params.userInput);
         let botResponse = "";
-
+        //console.log(userMessage);
         try {
           const { rows } = await searchLeaveBalance({
-            userId: user.id,
+            userId: user.$id,
             leaveType: userMessage,
           });
           rows.map((row) => {
             botResponse =
               botResponse +
-              `You have ${row.balanceDays} days ${userMessage} left for the year.\n`;
+              `You have ${row.balanceDays} days ${params.userInput} left for the year.\n`;
           });
 
           return botResponse;
@@ -104,10 +127,84 @@ const App = () => {
           return "Sorry, I'm having trouble connecting to the chat service.";
         }
       },
-      options: (params) => [
-        `Book your ${params.userInput}`,
-        "Return to the main menu",
-      ],
+      options: (params) => [`Book Leave`, "Return to Main Menu"],
+      function: (params) => {
+        if (params.userInput == `Book Leave`) {
+          updateForm({ employeeId: user.$id, status: "pending" });
+        }
+      },
+      path: (params) => {
+        console.log(params.userInput);
+        if (params.userInput == `Book Leave`) return "book_leave";
+        return "loop";
+      },
+    },
+    book_leave: {
+      message: "Please select from the category below",
+      options: ["Annual leave", "Sick Leave", "Maternity/Paternity Leave"],
+      function: (params) =>
+        updateForm({ leaveType: lowercaseFirstLetter(params.userInput) }),
+      path: (params) => {
+        if (params.userInput == "Annual Leave") return "ask_start";
+        if (params.userInput == "Sick Leave") return "ask_start";
+        if (params.userInput == "Maternity/Paternity Leave") return "ask_start";
+        return "loop";
+      },
+    },
+    ask_start: {
+      message: "Please enter your start date (Format: YYYY-MM-DD",
+      function: () => updateForm({ startDate: params.userInput }),
+      path: async (params) => {
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(params.userInput)) {
+          await params.injectMessage(
+            "Invalid date, please re-enter your start date",
+          );
+          return;
+        }
+        const date = new Date(params.userInput);
+        if (isNaN(date.getTime())) {
+          await params.injectMessage(
+            "Invalid date, please re-enter your start date",
+          );
+          return;
+        }
+        return "ask_end";
+      },
+    },
+    ask_end: {
+      message: "Please enter your end date (Format: YYYY-MM-DD",
+      function: () => updateForm({ startDate: params.userInput }),
+      path: async (params) => {
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(params.userInput)) {
+          await params.injectMessage(
+            "Invalid date, please re-enter your end date",
+          );
+          return;
+        }
+        const date = new Date(params.userInput);
+        if (isNaN(date.getTime())) {
+          await params.injectMessage(
+            "Invalid date, please re-enter your end date",
+          );
+          return;
+        }
+        return "submit_leave";
+      },
+    },
+    submit_leave: {
+      message: async () => {
+        const form = formRef.current;
+        try {
+          await submitLeaveApplication(form);
+          return "Leave application submitted successfully";
+        } catch (error) {
+          console.error("Chat Error:", error);
+          return "Sorry, I'm having trouble connecting to the chat service.";
+        }
+      },
+      options: ["Leave Management", "Return to Main Menu"],
       path: "loop",
     },
   };
@@ -174,6 +271,25 @@ const App = () => {
                 </GuestRoute>
               }
             />
+          </Route>
+          <Route path="/dashboard">
+            <Route
+              path=""
+              element={
+                <AuthRoute>
+                  <Dashboard />
+                </AuthRoute>
+              }
+            />
+            <Route
+              path="leave-management"
+              element={
+                <AuthRoute>
+                  <LeaveManagement />
+                </AuthRoute>
+              }
+            />
+            \
           </Route>
         </Routes>
       </Router>

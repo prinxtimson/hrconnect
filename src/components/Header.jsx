@@ -50,30 +50,40 @@ const Header = () => {
                 </Link>
               </div>
             </div>
-            <div className="hidden md:flex items-center space-x-8"></div>
-            {isAuthenticated ? (
-              <div
-                className="flex px-2 py-1.5 gap-2 items-center cursor-pointer shadow rounded-md bg-white"
-                onClick={toggleMenu}
-              >
-                <Menu model={menuItems} popup ref={menuRef} />
-
-                <div className="text-sm font-semibold">{user?.name}</div>
-                <Avatar
-                  label={`${user?.name.split(" ")[0].charAt(0)}${user?.name.split(" ")[1].charAt(0)}`}
-                  shape="circle"
-                  style={{ backgroundColor: "#6a008e", color: "#ffffff" }}
-                  //size="large"
-                />
+            <div className="flex items-center gap-4">
+              <div className="flex items-center space-x-8">
+                <Link
+                  to="/dashboard"
+                  className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors"
+                >
+                  Dashboard
+                </Link>
               </div>
-            ) : (
-              <button
-                className="text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-md px-4 py-2"
-                onClick={() => navigate("/login")}
-              >
-                Sign in
-              </button>
-            )}
+
+              {isAuthenticated ? (
+                <div
+                  className="flex px-2 py-1.5 gap-2 items-center cursor-pointer shadow rounded-md bg-white"
+                  onClick={toggleMenu}
+                >
+                  <Menu model={menuItems} popup ref={menuRef} />
+
+                  <div className="text-sm font-semibold">{user?.name}</div>
+                  <Avatar
+                    label={`${user?.name.split(" ")[0].charAt(0)}${user?.name.split(" ")[1].charAt(0)}`}
+                    shape="circle"
+                    style={{ backgroundColor: "#6a008e", color: "#ffffff" }}
+                    //size="large"
+                  />
+                </div>
+              ) : (
+                <button
+                  className="text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-md px-4 py-2"
+                  onClick={() => navigate("/login")}
+                >
+                  Sign in
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </nav>
