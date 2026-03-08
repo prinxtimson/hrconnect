@@ -12,7 +12,7 @@ export default async ({ req, res, log, error }) => {
 
   try {
     await databases.createDocument({
-      databaseId: rocess.env.APPWRITE_DATABASE_ID,
+      databaseId: process.env.APPWRITE_DATABASE_ID,
       collectionId: "users",
       documentId: user.$id,
       data: {
