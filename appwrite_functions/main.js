@@ -1,35 +1,31 @@
-import { Client, Users } from "node-appwrite";
+import { Client, Databases } from "node-appwrite";
 
-// This Appwrite function will be executed every time your function is triggered
 export default async ({ req, res, log, error }) => {
-  // You can use the Appwrite SDK to interact with other services
-  // For this example, we're using the Users service
   const client = new Client()
     .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT)
     .setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID)
     .setKey(req.headers["x-appwrite-key"] ?? "");
-  const users = new Users(client);
+
+  const databases = new Databases(client);
+
+  const user = JSON.parse(req.body);
 
   try {
-    const response = await users.list();
-    // Log messages and errors to the Appwrite Console
-    // These logs won't be seen by your end users
-    log(`Total users: ${response.total}`);
+    await databases.createDocument({
+      databaseId: rocess.env.APPWRITE_DATABASE_ID,
+      collectionId: "leaveapplications",
+      documentId: user.$id,
+      data: {
+        name: user.name,
+        email: user.email,
+        avatar: "public/avatar",
+      },
+    });
+
+    log(`Profile created for user: ${user.$id}`);
+    return res.send("Profile created");
   } catch (err) {
-    error("Could not list users: " + err.message);
+    error("Failed to create: " + err.message);
+    return res.send("Failed to create profile", 500);
   }
-
-  // The req object contains the request data
-  if (req.path === "/ping") {
-    // Use res object to respond with text(), json(), or binary()
-    // Don't forget to return a response!
-    return res.text("Pong");
-  }
-
-  return res.json({
-    motto: "Build like a team of hundreds_",
-    learn: "https://appwrite.io/docs",
-    connect: "https://appwrite.io/discord",
-    getInspired: "https://builtwith.appwrite.io",
-  });
 };
