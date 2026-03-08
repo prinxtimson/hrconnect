@@ -8,7 +8,7 @@ export default async ({ req, res, log, error }) => {
 
   const databases = new Databases(client);
 
-  const user = JSON.parse(req.body);
+  const user = JSON.parse(req.payload);
 
   try {
     await databases.createDocument({
