@@ -22,7 +22,7 @@ export default async ({ req, res, log, error }) => {
       },
     });
 
-    log(`Profile created for user: ${user.$id}`);
+    log(`Profile created for user: ${process.env.APPWRITE_FUNCTION_EVENT}`);
     return res.send("Profile created");
   } catch (err) {
     error("Failed to create: " + err.message);
