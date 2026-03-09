@@ -8,12 +8,13 @@ export default async ({ req, res, log, error }) => {
 
   const databases = new Databases(client);
 
+  const databaseId = process.env.APPWRITE_DATABASE_ID;
   const payload = req.body;
 
   try {
     if (req.headers["x-appwrite-event"] == `users.${payload.$id}.create`) {
       await databases.createDocument({
-        databaseId: process.env.APPWRITE_DATABASE_ID,
+        databaseId: databaseId,
         collectionId: "users",
         documentId: payload.$id,
         data: {
@@ -24,11 +25,15 @@ export default async ({ req, res, log, error }) => {
       });
     }
 
-    if (req.headers["x-appwrite-event"] == ``) {
+    if (
+      req.headers["x-appwrite-event"] ==
+        `databases.${databaseId}.tables.leaveapplications.rows.${payload.$id}.update` &&
+      payload.status == "approved"
+    ) {
       const days = calculateDays(payload.startDate, payload.endDate);
 
       const leaveBalances = await databases.listDocuments({
-        databaseId: process.env.APPWRITE_DATABASE_ID,
+        databaseId: databaseId,
         collectionId: "leavebalances",
         queries: [
           Query.equal("user", payload.user), // Specify which rows to update
