@@ -36,7 +36,7 @@ export default async ({ req, res, log, error }) => {
         databaseId: databaseId,
         collectionId: "leavebalances",
         queries: [
-          Query.equal("user", payload.user), // Specify which rows to update
+          Query.equal("user.$id", payload.user), // Specify which rows to update
           Query.equal("leaveType", payload.leaveType),
         ],
       });
