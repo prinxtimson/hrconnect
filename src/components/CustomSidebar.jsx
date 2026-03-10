@@ -17,6 +17,12 @@ const CustomSidebar = ({ user, customClass }) => {
       label: "Leave Management",
       link: "/dashboard/leave-management",
     },
+    {
+      id: "AGENTCHAT",
+      icon: "fa-address-book",
+      label: "Chat",
+      link: "/dashboard/chat-agent",
+    },
   ];
 
   return (

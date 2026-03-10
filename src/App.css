@@ -137,3 +137,13 @@
   background-repeat: no-repeat;
   background-size: cover;
 }
+
+.chip {
+  align-items: center;
+  border-image: none;
+  border-radius: 20px;
+  display: inline-flex;
+  height: 35px;
+  margin: 0px 10px 10px 0px;
+  padding: 0px 16px;
+}

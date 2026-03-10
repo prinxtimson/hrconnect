@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import { io, Socket } from "socket.io-client";
 import ChatBot from "react-chatbotify";
 
 import "./App.css";
@@ -17,12 +18,16 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import LeaveManagement from "./pages/LeaveManagement";
+import ChatAgent from "./pages/ChatAgent";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 const App = () => {
+  const [isOpen, setIsOpen] = useState(false);
   const [sessionId] = useState(crypto.randomUUID());
+  const [isHumanAgent, setIsHumanAgent] = useState(false);
   const formRef = useRef({});
+  const socketRef = useRef(null);
 
   // simple helper to update form
   const updateForm = (patch) => {
@@ -35,6 +40,10 @@ const App = () => {
 
   useEffect(() => {
     dispatch(getCurrentUser());
+
+    return () => {
+      socketRef.current?.disconnect();
+    };
   }, []);
 
   function lowercaseFirstLetter(str) {
@@ -70,7 +79,7 @@ const App = () => {
           let optionsArr =
             data
               .find((val) => val.message == "payload")
-              ?.payload?.fields?.options.listValue.values.map(
+              ?.payload?.fields.options.listValue.values.map(
                 (val) => val.stringValue,
               ) || [];
 
@@ -113,6 +122,7 @@ const App = () => {
         )
           return "leave_balance";
         if (params.userInput == "Submit Leave Request") return "book_leave";
+        if (params.userInput.match("Escalate")) return "human_handover";
         return "loop";
       },
     },
@@ -165,7 +175,7 @@ const App = () => {
       },
     },
     ask_start: {
-      message: "Please enter your start date (Format: YYYY-MM-DD",
+      message: "Please enter your start date (Format: YYYY-MM-DD)",
       function: (params) => updateForm({ startDate: params.userInput }),
       path: async (params) => {
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -186,7 +196,7 @@ const App = () => {
       },
     },
     ask_end: {
-      message: "Please enter your end date (Format: YYYY-MM-DD",
+      message: "Please enter your end date (Format: YYYY-MM-DD)",
       function: (params) => updateForm({ endDate: params.userInput }),
       path: async (params) => {
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -219,6 +229,41 @@ const App = () => {
       },
       options: ["Leave Management", "Return to Main Menu"],
       path: "loop",
+    },
+    human_handover: {
+      message:
+        "Connecting you to a human agent... You can now type your messages below.",
+      path: "human_chat",
+      function: () => {
+        socketRef.current = io();
+
+        socketRef.current.on("connect", () => {
+          socketRef.current.emit("join_chat", sessionId);
+          socketRef.current.emit("agent_transfer_requested", { sessionId });
+          console.log("Connected to socket server");
+        });
+      },
+    },
+    human_chat: {
+      message: async (params) => {
+        socketRef.current.emit("send_message", {
+          sessionId,
+          message: params.userInput,
+        });
+
+        socketRef.current.on("agent_message", async (msg) => {
+          await params.injectMessage(msg.message);
+        });
+      },
+      path: "human_chat",
+    },
+    unknown_input: {
+      message: "I didn't get that. Can you say it again?",
+      options: ["Escalate", "Return to Main Menu"],
+      path: (params) => {
+        if (params.userInput.match("Escalate")) return "human_handover";
+        return "loop";
+      },
     },
   };
 
@@ -302,7 +347,14 @@ const App = () => {
                 </AuthRoute>
               }
             />
-            \
+            <Route
+              path="chat-agent"
+              element={
+                <AuthRoute>
+                  <ChatAgent />
+                </AuthRoute>
+              }
+            />
           </Route>
         </Routes>
       </Router>

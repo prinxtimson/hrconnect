@@ -2,11 +2,19 @@ import express from "express";
 import dialogflow from "@google-cloud/dialogflow";
 import cors from "cors";
 import dotenv from "dotenv";
+import { createServer } from "http";
+import { Server } from "socket.io";
 
 dotenv.config();
 
 const app = express();
 app.use(express.json());
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*",
+  },
+});
 app.use(cors());
 
 const port = 8080;
@@ -22,6 +30,45 @@ const credentials = {
 //   key: credentials.private_key,
 //   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 // });
+
+const activeSessions = new Map();
+
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
+
+  socket.on("join_chat", (sessionId) => {
+    socket.join(sessionId);
+    console.log(`Socket ${socket.id} joined chat ${sessionId}`);
+
+    // If it's a user joining, notify agents
+    if (!activeSessions.has(sessionId)) {
+      activeSessions.set(sessionId, { userId: socket.id });
+    }
+  });
+
+  socket.on("send_message", (data) => {
+    const { sessionId, message, sender } = data;
+    // Broadcast to everyone in the room except the sender
+    socket.to(sessionId).emit("new_message", {
+      message,
+      sender,
+      timestamp: new Date(),
+    });
+  });
+
+  socket.on("agent_join", (sessionId) => {
+    socket.join(sessionId);
+    const session = activeSessions.get(sessionId);
+    if (session) {
+      session.agentId = socket.id;
+      io.to(sessionId).emit("agent_connected");
+    }
+  });
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
+  });
+});
 
 // const sheets = google.sheets({ version: "v4", auth });
 const sessionClient = new dialogflow.SessionsClient({

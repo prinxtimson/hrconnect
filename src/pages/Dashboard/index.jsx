@@ -1,5 +1,10 @@
 import { useRef, useEffect, useState } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import { useSelector } from "react-redux";
+import { DataTable } from "primereact/datatable";
+import { Column } from "primereact/column";
+import { Avatar } from "primereact/avatar";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 import {
   PieChart,
   Pie,
@@ -14,20 +19,21 @@ import {
 } from "recharts";
 
 import MainContainer from "../../layouts/MainContainer";
-import SentimentCard from "../../components/SentimentCard";
-import { getAllLeaveApplication } from "../../lib/appwrite";
+import { getAllLeaveApplication, getAuditLogs } from "../../lib/appwrite";
+import { Download } from "lucide-react";
+import moment from "moment";
 
 const index = () => {
   const toastRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [logs, setLogs] = useState([]);
   const [stats, setStats] = useState({
     total: 0,
     approved: 0,
     rejected: 0,
     pending: 0,
     cancelled: 0,
-    avgConfidence: 0,
   });
 
   const [chartData, setChartData] = useState([
@@ -40,6 +46,7 @@ const index = () => {
   const { user } = useSelector((state) => state.auth);
 
   useEffect(() => {
+    handleGetAuditLogs();
     handleGetLeaveApplication();
   }, []);
 
@@ -73,6 +80,16 @@ const index = () => {
     }
   };
 
+  const handleGetAuditLogs = async () => {
+    try {
+      const res = await getAuditLogs();
+      setLogs(res.rows);
+    } catch (error) {
+      console.error("Error:", error.message);
+      setError(error.message);
+    }
+  };
+
   useEffect(() => {
     if (error) {
       toastRef.current.show({
@@ -84,6 +101,36 @@ const index = () => {
       });
     }
   }, [error]);
+
+  const exportToExcel = (fileName) => {
+    const logsData = logs.map((val) => ({ ...val, user: val.user.name }));
+    // Create a new workbook and a worksheet from JSON data
+    const worksheet = XLSX.utils.json_to_sheet(logsData);
+    const workbook = XLSX.utils.book_new();
+
+    // Append the worksheet to the workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+
+    // Write the workbook to a file and save it
+    XLSX.writeFile(workbook, `${fileName}.xlsx`);
+  };
+
+  const userBodyTemplate = (rowData) => {
+    return (
+      <div className="flex align-items-center gap-2">
+        <Avatar
+          label={`${rowData.user?.name?.split(" ")[0]?.charAt(0)}${rowData.user?.name?.split(" ")[1]?.charAt(0)}`}
+          shape="circle"
+          style={{ backgroundColor: "#6a008e", color: "#ffffff" }}
+        />
+        <span>{rowData.user?.name}</span>
+      </div>
+    );
+  };
+
+  const dateBodyTemplate = (rowData) => {
+    return <div className="">{moment(rowData.$createdAt).format("ll")}</div>;
+  };
 
   return (
     <MainContainer toast={toastRef}>
@@ -204,48 +251,62 @@ const index = () => {
               </span>
             </h2>
 
-            <a
-              href={`/sentiments/download`}
-              download
-              className="border border-gray-200 shadow py-2 px-4 rounded"
+            <button
+              onClick={() => exportToExcel("AuditLogs")}
+              className="border border-gray-200 shadow py-2 px-4 rounded flex items-center cursor-pointer"
             >
               <span className="text-sm mr-2">Export</span>
-              <i
-                className="fa fa-download text-sm"
-                data-pr-tooltip="Download"
-              ></i>
-            </a>
+
+              <Download />
+            </button>
           </div>
 
           <div className="grid grid-cols-1 gap-4 h-full">
             <div className="relative h-[26vh] overflow-auto">
-              <div className="h-full border border-slate-200 bg-white rounded-md"></div>
-              {/* {sentiments.length === 0 ? (
-                            <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl py-20 flex flex-col items-center justify-center text-slate-400">
-                                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                                    <i className="fas fa-inbox text-2xl"></i>
-                                </div>
-                                <p className="font-medium">
-                                    Analysis history is empty
-                                </p>
-                            </div>
-                        ) : sentiments.length > 5 ? (
-                            sentiments.slice(0, 5).map((res) => (
-                                <SentimentCard
-                                    key={res.id}
-                                    result={res}
-                                    //onDelete={deleteResult}
-                                />
-                            ))
-                        ) : (
-                            sentiments.map((res) => (
-                                <SentimentCard
-                                    key={res.id}
-                                    result={res}
-                                    //onDelete={deleteResult}
-                                />
-                            ))
-                        )} */}
+              <div className="h-full border border-slate-200 bg-white rounded-md">
+                <DataTable
+                  value={logs}
+                  paginator
+                  rows={20}
+                  totalRecords={logs.length}
+                  loading={isLoading}
+                  breakpoint="0px"
+                  tableStyle={{ minWidth: "50rem" }}
+                  dataKey="$id"
+                  stripedRows
+                >
+                  <Column field="$id" header="ID"></Column>
+                  <Column
+                    field="actionType"
+                    header="Action Type"
+                    style={{ minWidth: "8rem" }}
+                  ></Column>
+                  <Column
+                    field="entityType"
+                    header="Entity Type"
+                    style={{ minWidth: "10rem" }}
+                  ></Column>
+                  <Column
+                    field="user"
+                    header="User"
+                    style={{ minWidth: "10rem" }}
+                    body={userBodyTemplate}
+                  ></Column>
+                  <Column
+                    field="details"
+                    header="Details"
+                    style={{ minWidth: "15rem" }}
+                  ></Column>
+
+                  <Column field="location" header="Location"></Column>
+                  <Column
+                    field="$createdAt"
+                    header="TimeStamp"
+                    style={{ minWidth: "10rem" }}
+                    body={dateBodyTemplate}
+                  ></Column>
+                </DataTable>
+              </div>
             </div>
           </div>
         </div>
