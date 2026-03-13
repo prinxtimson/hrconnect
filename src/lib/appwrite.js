@@ -116,33 +116,37 @@ export const approveLeaveApplication = async (data) => {
   const res = await tablesDB.updateRow({
     databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID,
     tableId: "leaveapplications",
-    rowId: data.id,
+    rowId: data.$id,
     data: {
-      approverId: data.adminId,
-      approvalDate: data.approvalDate,
+      admin: data.admin,
+      status: data.status,
+      approveAt: data.approveAt,
       comment: data.comment,
     },
   });
-  const days = calculateDays(res.startDate, res.endDate);
-  const rowsRes = await tablesDB.listRows({
-    databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID,
-    tableId: "leavebalances",
-    queries: [
-      Query.equal("user", res.user), // Specify which rows to update
-      Query.equal("leaveType", res.leaveType),
-    ],
-  });
-  for (let row of rowsRes.rows) {
-    await tablesDB.updateRow({
+  if (data.status == "approved") {
+    const days = calculateDays(res.startDate, res.endDate);
+    const rowsRes = await tablesDB.listRows({
       databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID,
       tableId: "leavebalances",
-      rowId: row.$id,
-      data: {
-        balanceDays: row.balanceDays - days,
-        usedDays: row.usedDays + days,
-      },
+      queries: [
+        Query.equal("user", res.user.$id), // Specify which rows to update
+        Query.equal("leaveType", res.leaveType),
+      ],
     });
+    for (let row of rowsRes.rows) {
+      await tablesDB.updateRow({
+        databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID,
+        tableId: "leavebalances",
+        rowId: row.$id,
+        data: {
+          balanceDays: row.balanceDays - days,
+          usedDays: row.usedDays + days,
+        },
+      });
+    }
   }
+
   const id = (await account.get()).$id;
   createAuditLogs({
     actionType: "update",
@@ -159,6 +163,6 @@ function calculateDays(startDate, endDate) {
   let start = new Date(startDate);
   let end = new Date(endDate);
   let timeDifference = end - start;
-  let daysDifference = timeDifference / (1000 * 3600 * 24);
+  let daysDifference = Math.round(timeDifference / (1000 * 3600 * 24));
   return daysDifference;
 }

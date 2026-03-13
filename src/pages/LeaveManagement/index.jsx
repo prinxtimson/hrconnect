@@ -1,28 +1,33 @@
 import { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import { DataTable } from "primereact/datatable";
 import { InputText } from "primereact/inputtext";
 import { Button } from "primereact/button";
-import { Dropdown } from "primereact/dropdown";
-import { IconField } from "primereact/iconfield";
-import { InputIcon } from "primereact/inputicon";
-import { SquarePen, Trash } from "lucide-react";
+import { SquarePen, Check } from "lucide-react";
 import { Column } from "primereact/column";
 import { Avatar } from "primereact/avatar";
 import { Tag } from "primereact/tag";
 import moment from "moment";
 
 import MainContainer from "../../layouts/MainContainer";
-import { getAllLeaveApplication } from "../../lib/appwrite";
+import {
+  approveLeaveApplication,
+  getAllLeaveApplication,
+} from "../../lib/appwrite";
+import LeaveEditModal from "./LeaveEditModal";
 
 const index = () => {
   const toastRef = useRef(null);
+  const [visible, setVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
+  const [selectedLeave, setSelectedLeave] = useState(null);
   const [data, setData] = useState([]);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState(null);
+  const [msg, setMsg] = useState(null);
+
+  const { user } = useSelector((state) => state.auth);
 
   useEffect(() => {
     handleGetLeaveApplication();
@@ -50,7 +55,18 @@ const index = () => {
         onHide: () => setError(null),
       });
     }
-  }, [error]);
+
+    if (msg) {
+      handleGetLeaveApplication();
+      toastRef.current.show({
+        severity: "success",
+        summary: "Success",
+        detail: msg,
+        life: 3000,
+        onHide: () => setMsg(null),
+      });
+    }
+  }, [error, msg]);
 
   const getSeverity = (status) => {
     switch (status) {
@@ -84,29 +100,50 @@ const index = () => {
     }
   };
 
+  const approveLeave = async (row) => {
+    try {
+      const res = await approveLeaveApplication({
+        ...row,
+        status: "approved",
+        admin: user.$id,
+        approveAt: new Date(),
+      });
+
+      let ind = data.findIndex((val) => val.$id == row.$id);
+      let rows = [...data];
+      rows.splice(ind, 1, res);
+      setData([...rows]);
+      setMsg("Leave application updated successfully");
+    } catch (error) {
+      setError(error.message);
+    }
+  };
+
   const actionBodyTemplate = (rowData) => {
     return (
       <div className="flex gap-1 items-center text-[#f8fafc]">
-        <button
-          onClick={(e) => navigate(`#`)}
-          className="w-10 h-10 rounded-full bg-slate-500 flex items-center justify-center hover:bg-slate-400"
-          title="Edit"
-        >
-          <SquarePen />
-        </button>
-
-        {/* <button
-          onClick={() => {
-            if (
-              window.confirm(`You are about to delete this user are you sure?`)
-            ) {
-            }
+        <Button
+          onClick={() => approveLeave(rowData)}
+          disabled={rowData.status == "approved"}
+          icon={<Check />}
+          rounded
+          raised
+          severity="success"
+          aria-label="Approve"
+          tooltip="Approve"
+        />
+        <Button
+          onClick={(e) => {
+            setSelectedLeave(rowData);
+            setVisible(true);
           }}
-          className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center hover:bg-red-500"
-          title="Delete"
-        >
-          <Trash />
-        </button> */}
+          icon={<SquarePen />}
+          rounded
+          raised
+          severity="secondary"
+          aria-label="Edit"
+          tooltip="Edit"
+        />
       </div>
     );
   };
@@ -142,8 +179,20 @@ const index = () => {
     );
   };
 
+  const handleOnHide = () => {
+    setVisible(false);
+    setSelectedLeave(null);
+  };
+
   return (
     <MainContainer toast={toastRef}>
+      <LeaveEditModal
+        visible={visible}
+        handleOnHide={handleOnHide}
+        payload={selectedLeave}
+        setError={setError}
+        setMsg={setMsg}
+      />
       <div className="shadow-md rounded-lg p-2 bg-white border border-slate-200">
         <div className="w-full rounded">
           <DataTable

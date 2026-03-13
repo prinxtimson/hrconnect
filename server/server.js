@@ -9,13 +9,15 @@ dotenv.config();
 
 const app = express();
 app.use(express.json());
+app.use(cors());
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: "*",
+    methods: ["GET", "POST"],
   },
 });
-app.use(cors());
 
 const port = 8080;
 
@@ -36,38 +38,66 @@ const activeSessions = new Map();
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  socket.on("join_chat", (sessionId) => {
-    socket.join(sessionId);
-    console.log(`Socket ${socket.id} joined chat ${sessionId}`);
-
-    // If it's a user joining, notify agents
-    if (!activeSessions.has(sessionId)) {
-      activeSessions.set(sessionId, { userId: socket.id });
+  socket.on("user_message", (data) => {
+    const { sessionId, message, sender } = data;
+    console.log(`session id: ${sessionId}`);
+    // Broadcast to everyone in the room except the sender
+    if (activeSessions[sessionId]) {
+      const msg = { text: message, sender, timestamp: new Date() };
+      activeSessions[sessionId].messages.push(msg);
+      socket.to(sessionId).emit("new_message", { sessionId, message: msg });
     }
   });
 
-  socket.on("send_message", (data) => {
+  socket.on("agent_message", (data) => {
     const { sessionId, message, sender } = data;
     // Broadcast to everyone in the room except the sender
-    socket.to(sessionId).emit("new_message", {
-      message,
-      sender,
-      timestamp: new Date(),
-    });
+    if (activeSessions[sessionId]) {
+      const msg = { text: message, sender, timestamp: new Date() };
+      activeSessions[sessionId].messages.push(msg);
+      socket.to(sessionId).emit("new_message", msg);
+    }
   });
 
   socket.on("agent_join", (sessionId) => {
     socket.join(sessionId);
-    const session = activeSessions.get(sessionId);
-    if (session) {
-      session.agentId = socket.id;
-      io.to(sessionId).emit("agent_connected");
-    }
+
+    io.to(sessionId).emit("agent_connected");
   });
 
-  socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+  socket.on("connected", () => {
+    socket.emit(
+      "active_sessions",
+      Object.keys(activeSessions).map((sid) => ({
+        sessionId: sid,
+        messages: activeSessions[sid].messages,
+      })),
+    );
   });
+
+  socket.on("escalate", (sessionId) => {
+    socket.join(sessionId);
+    const msg = {
+      text: "A user will like to transfer to an agent!",
+      sender: "system",
+      timestamp: new Date(),
+    };
+    // If it's a user joining, notify agents
+    if (!activeSessions.has(sessionId)) {
+      activeSessions.set(sessionId, {
+        messages: [msg],
+      });
+    }
+
+    socket.emit("agent_transfer_requested", {
+      sessionId: sid,
+      messages: msg,
+    });
+  });
+
+  // socket.on("disconnect", () => {
+  //   console.log("User disconnected:", socket.id);
+  // });
 });
 
 // const sheets = google.sheets({ version: "v4", auth });
@@ -144,7 +174,7 @@ app.post("/api/chat", async (req, res) => {
 // });
 
 // Start the server
-app.listen(port, () => {
+httpServer.listen(port, () => {
   console.log(`Example app listening at http://localhost:${port}`);
 });
 

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-import { io, Socket } from "socket.io-client";
-import ChatBot from "react-chatbotify";
+import { socket } from "./lib/socket";
+import ChatBot, { useMessages } from "react-chatbotify";
 
 import "./App.css";
 
@@ -23,11 +23,10 @@ import ChatAgent from "./pages/ChatAgent";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 const App = () => {
-  const [isOpen, setIsOpen] = useState(false);
   const [sessionId] = useState(crypto.randomUUID());
+  const { injectMessage } = useMessages();
   const [isHumanAgent, setIsHumanAgent] = useState(false);
   const formRef = useRef({});
-  const socketRef = useRef(null);
 
   // simple helper to update form
   const updateForm = (patch) => {
@@ -40,11 +39,29 @@ const App = () => {
 
   useEffect(() => {
     dispatch(getCurrentUser());
+  }, []);
+
+  useEffect(() => {
+    console.log(isHumanAgent);
+    if (isHumanAgent) {
+      socket.on("connect", () => {
+        socket.emit("escalate", sessionId);
+        console.log("Connected to socket server");
+      });
+
+      socket.on("agent_connected", async (msg) => {
+        await injectMessage("Connected to an agent.. ");
+      });
+
+      socket.on("new_message", async (msg) => {
+        await injectMessage(msg.text);
+      });
+    }
 
     return () => {
-      socketRef.current?.disconnect();
+      socket.disconnect();
     };
-  }, []);
+  }, [isHumanAgent]);
 
   function lowercaseFirstLetter(str) {
     if (!str || typeof str !== "string") {
@@ -66,6 +83,7 @@ const App = () => {
       options: async (params) => {
         const userMessage = params.userInput;
         let botResponse = "";
+        const urlRegex = /https?:\/\/[^\s]+/;
 
         try {
           const response = await fetch(`${API_URL}/api/chat`, {
@@ -89,7 +107,27 @@ const App = () => {
               botResponse = botResponse + `${msg.text.text[0]}\n`;
             });
 
-          await params.injectMessage(botResponse);
+          if (urlRegex.test(botResponse)) {
+            let txt = botResponse.match(urlRegex);
+            let txt2 = botResponse.replace(txt, "");
+            await params.injectMessage(
+              <div
+                className="rcb-bot-message rcb-bot-message-entry"
+                style={{
+                  backgroundColor: "rgb(73, 29, 141)",
+                  color: "rgb(255, 255, 255)",
+                  maxWidth: "65%",
+                }}
+              >
+                <span>{txt2}</span>{" "}
+                <a href={`${txt}`} target="_blank">
+                  {txt}
+                </a>
+              </div>,
+            );
+          } else {
+            await params.injectMessage(botResponse);
+          }
 
           return optionsArr;
         } catch (error) {
@@ -103,6 +141,10 @@ const App = () => {
       function: (params) => {
         if (params.userInput == "Submit Leave Request") {
           updateForm({ user: user.$id, status: "pending" });
+        }
+
+        if (params.userInput.match("Escalate")) {
+          setIsHumanAgent(true);
         }
       },
       path: (params) => {
@@ -231,28 +273,27 @@ const App = () => {
       path: "loop",
     },
     human_handover: {
-      message:
-        "Connecting you to a human agent... You can now type your messages below.",
-      path: "human_chat",
-      function: () => {
-        socketRef.current = io();
-
-        socketRef.current.on("connect", () => {
-          socketRef.current.emit("join_chat", sessionId);
-          socketRef.current.emit("agent_transfer_requested", { sessionId });
-          console.log("Connected to socket server");
+      message: "",
+      function: (params) => {
+        console.log("human handover");
+        socket.emit("user_message", {
+          sessionId,
+          message: params.userInput,
+          sender: "user",
         });
       },
+      path: "human_handover",
     },
     human_chat: {
       message: async (params) => {
-        socketRef.current.emit("send_message", {
+        socket.emit("user_message", {
           sessionId,
           message: params.userInput,
+          sender: "user",
         });
 
-        socketRef.current.on("agent_message", async (msg) => {
-          await params.injectMessage(msg.message);
+        socket.on("new_message", async (msg) => {
+          await params.injectMessage(msg.text);
         });
       },
       path: "human_chat",

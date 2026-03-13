@@ -1,9 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { io } from "socket.io-client";
+import { socket } from "../../lib/socket";
 import { Bot, MessageSquare, Send, User } from "lucide-react";
 import MainContainer from "../../layouts/MainContainer";
-
-const socket = io();
 
 const index = () => {
   const toastRef = useRef(null);
@@ -13,7 +11,10 @@ const index = () => {
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    socket.emit("agent_join");
+    socket.on("connect", () => {
+      socket.emit("connected");
+      console.log("Connected to socket server");
+    });
 
     socket.on("active_sessions", (sessions) => {
       setActiveSessions(
@@ -28,8 +29,23 @@ const index = () => {
     });
 
     socket.on("agent_transfer_requested", (data) => {
-      // In a real app, we'd fetch the session details. For now, we wait for the next message or refresh.
-      console.log("New transfer requested:", data.sessionId);
+      setActiveSessions((prev) =>
+        prev.map((s) => {
+          if (s.sessionId === data.sessionId) {
+            return {
+              ...s,
+              messages: [
+                ...s.messages,
+                {
+                  ...data.message,
+                  timestamp: new Date(data.message.timestamp),
+                },
+              ],
+            };
+          }
+          return s;
+        }),
+      );
     });
 
     socket.on("new_message", (data) => {
@@ -52,23 +68,10 @@ const index = () => {
       );
     });
 
-    socket.on("bot_response", (msg) => {
-      // If the agent themselves sent it, it will come back here via the room broadcast
-      // We handle it by updating the active sessions
-      setActiveSessions((prev) =>
-        prev.map((s) => {
-          // We don't have the sessionId in the bot_response event easily here without room logic
-          // But for this demo, we can assume the server broadcasts to the room
-          return s;
-        }),
-      );
-    });
-
     return () => {
       socket.off("active_sessions");
       socket.off("agent_transfer_requested");
       socket.off("new_message");
-      socket.off("bot_response");
     };
   }, []);
 
@@ -80,6 +83,10 @@ const index = () => {
     scrollToBottom();
   }, [selectedSessionId, activeSessions]);
 
+  useEffect(() => {
+    socket.emit("agent_join", selectedSessionId);
+  }, [selectedSessionId]);
+
   const handleSend = (e) => {
     e.preventDefault();
     if (!input.trim() || !selectedSessionId) return;
@@ -87,6 +94,7 @@ const index = () => {
     socket.emit("agent_message", {
       sessionId: selectedSessionId,
       message: input,
+      sender: "agent",
     });
 
     // Optimistically update UI
@@ -100,7 +108,7 @@ const index = () => {
               {
                 id: Date.now().toString(),
                 text: input,
-                sender: "bot",
+                sender: "agent",
                 timestamp: new Date(),
                 source: "Human Agent",
               },
@@ -138,7 +146,9 @@ const index = () => {
                 activeSessions.map((session) => (
                   <button
                     key={session.sessionId}
-                    onClick={() => setSelectedSessionId(session.sessionId)}
+                    onClick={() => {
+                      setSelectedSessionId(session.sessionId);
+                    }}
                     className={`w-full p-4 text-left border-b border-neutral-100 transition-colors hover:bg-neutral-50 ${
                       selectedSessionId === session.sessionId
                         ? "bg-emerald-50 border-l-4 border-l-emerald-500"
@@ -212,11 +222,6 @@ const index = () => {
                               hour: "2-digit",
                               minute: "2-digit",
                             })}
-                            {msg.source && (
-                              <span className="ml-2 italic">
-                                via {msg.source}
-                              </span>
-                            )}
                           </div>
                         </div>
                       </div>
