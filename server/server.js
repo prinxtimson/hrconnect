@@ -33,31 +33,32 @@ const credentials = {
 //   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 // });
 
-const activeSessions = new Map();
+const activeSessions = {};
 
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  socket.on("user_message", (data) => {
-    const { sessionId, message, sender } = data;
-    console.log(`session id: ${sessionId}`);
+  socket.on("send_message", (data) => {
+    const { sessionId, id, text, sender, timestamp } = data;
+
     // Broadcast to everyone in the room except the sender
     if (activeSessions[sessionId]) {
-      const msg = { text: message, sender, timestamp: new Date() };
+      const msg = { id, text, sender, timestamp };
       activeSessions[sessionId].messages.push(msg);
-      socket.to(sessionId).emit("new_message", { sessionId, message: msg });
+      io.to(sessionId).emit("new_message", { sessionId, message: msg });
     }
   });
 
-  socket.on("agent_message", (data) => {
-    const { sessionId, message, sender } = data;
-    // Broadcast to everyone in the room except the sender
-    if (activeSessions[sessionId]) {
-      const msg = { text: message, sender, timestamp: new Date() };
-      activeSessions[sessionId].messages.push(msg);
-      socket.to(sessionId).emit("new_message", msg);
-    }
-  });
+  // socket.on("agent_message", (data) => {
+  //   const { sessionId, message, sender } = data;
+  //   // Broadcast to everyone in the room except the sender
+  //   if (activeSessions[sessionId]) {
+  //     console.log(`session id: ${sessionId}`);
+  //     const msg = { text: message, sender, timestamp: new Date() };
+  //     activeSessions[sessionId].messages.push(msg);
+  //     socket.to(sessionId).emit("new_message", msg);
+  //   }
+  // });
 
   socket.on("agent_join", (sessionId) => {
     socket.join(sessionId);
@@ -83,15 +84,13 @@ io.on("connection", (socket) => {
       timestamp: new Date(),
     };
     // If it's a user joining, notify agents
-    if (!activeSessions.has(sessionId)) {
-      activeSessions.set(sessionId, {
-        messages: [msg],
-      });
+    if (!activeSessions[sessionId]) {
+      activeSessions[sessionId] = { messages: [msg] };
     }
 
     socket.emit("agent_transfer_requested", {
-      sessionId: sid,
-      messages: msg,
+      sessionId,
+      messages: [msg],
     });
   });
 

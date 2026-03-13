@@ -24,7 +24,7 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 const App = () => {
   const [sessionId] = useState(crypto.randomUUID());
-  const { injectMessage } = useMessages();
+  //const { injectMessage } = useMessages();
   const [isHumanAgent, setIsHumanAgent] = useState(false);
   const formRef = useRef({});
 
@@ -42,19 +42,11 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    console.log(isHumanAgent);
     if (isHumanAgent) {
+      socket.connect();
       socket.on("connect", () => {
         socket.emit("escalate", sessionId);
         console.log("Connected to socket server");
-      });
-
-      socket.on("agent_connected", async (msg) => {
-        await injectMessage("Connected to an agent.. ");
-      });
-
-      socket.on("new_message", async (msg) => {
-        await injectMessage(msg.text);
       });
     }
 
@@ -273,31 +265,42 @@ const App = () => {
       path: "loop",
     },
     human_handover: {
-      message: "",
+      message: async (params) => {
+        socket.on("agent_connected", async (msg) => {
+          console.log("agent_connected");
+          await params.injectMessage("Connected to an agent.. ");
+        });
+
+        socket.on("new_message", async (data) => {
+          await params.injectMessage(data.message.text);
+        });
+      },
       function: (params) => {
         console.log("human handover");
-        socket.emit("user_message", {
+        socket.emit("send_message", {
+          id: Date.now().toString(),
           sessionId,
-          message: params.userInput,
+          text: params.userInput,
           sender: "user",
+          timestamp: new Date(),
         });
       },
       path: "human_handover",
     },
-    human_chat: {
-      message: async (params) => {
-        socket.emit("user_message", {
-          sessionId,
-          message: params.userInput,
-          sender: "user",
-        });
+    // human_chat: {
+    //   message: async (params) => {
+    //     socket.emit("user_message", {
+    //       sessionId,
+    //       message: params.userInput,
+    //       sender: "user",
+    //     });
 
-        socket.on("new_message", async (msg) => {
-          await params.injectMessage(msg.text);
-        });
-      },
-      path: "human_chat",
-    },
+    //     socket.on("new_message", async (msg) => {
+    //       await params.injectMessage(msg.text);
+    //     });
+    //   },
+    //   path: "human_chat",
+    // },
     unknown_input: {
       message: "I didn't get that. Can you say it again?",
       options: ["Escalate", "Return to Main Menu"],

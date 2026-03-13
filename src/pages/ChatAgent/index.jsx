@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { socket } from "../../lib/socket";
 import { Bot, MessageSquare, Send, User } from "lucide-react";
 import MainContainer from "../../layouts/MainContainer";
+import moment from "moment";
 
 const index = () => {
   const toastRef = useRef(null);
@@ -17,51 +18,28 @@ const index = () => {
     });
 
     socket.on("active_sessions", (sessions) => {
-      setActiveSessions(
-        sessions.map((s) => ({
-          ...s,
-          messages: s.messages.map((m) => ({
-            ...m,
-            timestamp: new Date(m.timestamp),
-          })),
-        })),
-      );
+      //console.log(sessions);
+      setActiveSessions([...sessions]);
     });
 
     socket.on("agent_transfer_requested", (data) => {
-      setActiveSessions((prev) =>
-        prev.map((s) => {
-          if (s.sessionId === data.sessionId) {
-            return {
-              ...s,
-              messages: [
-                ...s.messages,
-                {
-                  ...data.message,
-                  timestamp: new Date(data.message.timestamp),
-                },
-              ],
-            };
-          }
-          return s;
-        }),
-      );
+      setActiveSessions([data, ...activeSessions]);
     });
 
     socket.on("new_message", (data) => {
+      console.log("new_message");
       setActiveSessions((prev) =>
         prev.map((s) => {
           if (s.sessionId === data.sessionId) {
-            return {
-              ...s,
-              messages: [
-                ...s.messages,
-                {
-                  ...data.message,
-                  timestamp: new Date(data.message.timestamp),
-                },
-              ],
-            };
+            let ind = s.messages.findIndex((itm) => itm.id === data.message.id);
+            if (ind === -1) {
+              return {
+                ...s,
+                messages: [...s.messages, data.message],
+              };
+            } else {
+              return s;
+            }
           }
           return s;
         }),
@@ -84,18 +62,24 @@ const index = () => {
   }, [selectedSessionId, activeSessions]);
 
   useEffect(() => {
-    socket.emit("agent_join", selectedSessionId);
+    if (selectedSessionId) {
+      socket.emit("agent_join", selectedSessionId);
+    }
   }, [selectedSessionId]);
 
   const handleSend = (e) => {
     e.preventDefault();
     if (!input.trim() || !selectedSessionId) return;
 
-    socket.emit("agent_message", {
+    const msg = {
+      id: Date.now().toString(),
       sessionId: selectedSessionId,
-      message: input,
+      text: input,
       sender: "agent",
-    });
+      timestamp: new Date(),
+    };
+
+    socket.emit("send_message", msg);
 
     // Optimistically update UI
     setActiveSessions((prev) =>
@@ -103,16 +87,7 @@ const index = () => {
         if (s.sessionId === selectedSessionId) {
           return {
             ...s,
-            messages: [
-              ...s.messages,
-              {
-                id: Date.now().toString(),
-                text: input,
-                sender: "agent",
-                timestamp: new Date(),
-                source: "Human Agent",
-              },
-            ],
+            messages: [...s.messages, msg],
           };
         }
         return s;
@@ -218,7 +193,7 @@ const index = () => {
                           <div
                             className={`text-[10px] text-neutral-400 px-1 ${msg.sender === "user" ? "text-left" : "text-right"}`}
                           >
-                            {msg.timestamp.toLocaleTimeString([], {
+                            {moment(msg.timestamp).toLocaleString([], {
                               hour: "2-digit",
                               minute: "2-digit",
                             })}
