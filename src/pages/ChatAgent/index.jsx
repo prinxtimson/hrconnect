@@ -12,10 +12,7 @@ const index = () => {
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    socket.on("connect", () => {
-      socket.emit("connected");
-      console.log("Connected to socket server");
-    });
+    socket.emit("agent_connected");
 
     socket.on("active_sessions", (sessions) => {
       //console.log(sessions);
@@ -27,7 +24,6 @@ const index = () => {
     });
 
     socket.on("new_message", (data) => {
-      console.log("new_message");
       setActiveSessions((prev) =>
         prev.map((s) => {
           if (s.sessionId === data.sessionId) {

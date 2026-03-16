@@ -31,9 +31,11 @@ const CustomSidebar = ({ user, customClass }) => {
         {/* <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
                     <i className="fas fa-robot text-xl"></i>
                 </div> */}
-        <span className="font-bold text-xl text-white tracking-tight">
-          HR Connect
-        </span>
+        <Link to="/">
+          <span className="font-bold text-xl text-white tracking-tight">
+            HR Connect
+          </span>
+        </Link>
       </div>
 
       <nav className="grow px-4 mt-4">

@@ -45,28 +45,18 @@ io.on("connection", (socket) => {
     if (activeSessions[sessionId]) {
       const msg = { id, text, sender, timestamp };
       activeSessions[sessionId].messages.push(msg);
-      io.to(sessionId).emit("new_message", { sessionId, message: msg });
+      socket.broadcast
+        .to(sessionId)
+        .emit("new_message", { sessionId, message: msg });
     }
   });
 
-  // socket.on("agent_message", (data) => {
-  //   const { sessionId, message, sender } = data;
-  //   // Broadcast to everyone in the room except the sender
-  //   if (activeSessions[sessionId]) {
-  //     console.log(`session id: ${sessionId}`);
-  //     const msg = { text: message, sender, timestamp: new Date() };
-  //     activeSessions[sessionId].messages.push(msg);
-  //     socket.to(sessionId).emit("new_message", msg);
-  //   }
-  // });
-
   socket.on("agent_join", (sessionId) => {
     socket.join(sessionId);
-
-    io.to(sessionId).emit("agent_connected");
+    socket.broadcast.to(sessionId).emit("agent_joined");
   });
 
-  socket.on("connected", () => {
+  socket.on("agent_connected", () => {
     socket.emit(
       "active_sessions",
       Object.keys(activeSessions).map((sid) => ({
@@ -87,16 +77,16 @@ io.on("connection", (socket) => {
     if (!activeSessions[sessionId]) {
       activeSessions[sessionId] = { messages: [msg] };
     }
-
-    socket.emit("agent_transfer_requested", {
+    console.log("agent_transfer_requested");
+    socket.broadcast.emit("agent_transfer_requested", {
       sessionId,
       messages: [msg],
     });
   });
 
-  // socket.on("disconnect", () => {
-  //   console.log("User disconnected:", socket.id);
-  // });
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
+  });
 });
 
 // const sheets = google.sheets({ version: "v4", auth });

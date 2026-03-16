@@ -1,165 +1,332 @@
-import { motion, AnimatePresence } from "motion/react";
-import { User, Bot, ChevronDown, Loader2, Send, Headset } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { RefreshCcw } from "lucide-react";
+import { useSelector } from "react-redux";
+import { Button } from "primereact/button";
+import { v4 as uuid } from "uuid";
+import ChatBotify, {
+  Button as ChatBotton,
+  useFlow,
+  ChatBotProvider,
+} from "react-chatbotify";
+import { socket } from "../lib/socket";
 
-const ChatBot = ({
-  messages,
-  handleToggleIsOpen,
-  isLoading,
-  messagesEndRef,
-  handleSend,
-  input,
-  setInput,
-}) => {
-  return (
-    <motion.div
-      initial={{
-        opacity: 0,
-        scale: 0.9,
-        y: 20,
-        transformOrigin: "bottom right",
-      }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.9, y: 20 }}
-      className="fixed bottom-24 right-6 w-[400px] h-[600px] bg-white rounded-3xl shadow-2xl border border-neutral-200 flex flex-col overflow-hidden z-50 max-sm:w-[calc(100vw-3rem)] max-sm:h-[calc(100vh-8rem)]"
-    >
-      {/* Header */}
-      <div className="p-4 bg-[#6a008e] text-white flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-neutral-800 rounded-full flex items-center justify-center">
-            <Bot size={20} />
-          </div>
-          <div>
-            <h2 className="font-semibold text-sm">AI Assistant</h2>
-            <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-[10px] text-neutral-400 uppercase tracking-wider font-medium">
-                Online
-              </span>
-            </div>
-          </div>
-        </div>
-        <button
-          onClick={handleToggleIsOpen}
-          className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
-        >
-          <ChevronDown size={20} />
-        </button>
-      </div>
+import { searchLeaveBalance, submitLeaveApplication } from "../lib/appwrite";
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-neutral-50/50">
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`flex gap-2 max-w-[80%] ${msg.sender === "user" ? "flex-row-reverse" : "flex-row"}`}
-            >
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+
+const ChatBot = () => {
+  const { restartFlow } = useFlow();
+  const [sessionId] = useState(uuid());
+  const [isHumanAgent, setIsHumanAgent] = useState(false);
+  const formRef = useRef({});
+
+  let prevMsg = {};
+
+  const { user } = useSelector((state) => state.auth);
+
+  // simple helper to update form
+  const updateForm = (patch) => {
+    Object.assign(formRef.current, patch);
+  };
+
+  useEffect(() => {
+    if (isHumanAgent) {
+      socket.emit("escalate", sessionId);
+    } else {
+      socket.off("new_message");
+      socket.off("agent_connected");
+    }
+  }, [isHumanAgent]);
+
+  function lowercaseFirstLetter(str) {
+    if (!str || typeof str !== "string") {
+      return ""; // Handle empty or non-string inputs gracefully
+    }
+    str = str.replaceAll(" ", "");
+    str = str.replace("/Paternity", "");
+    return str.charAt(0).toLowerCase() + str.slice(1);
+  }
+
+  const flow = {
+    start: {
+      message:
+        "Hi! I'm Emily, HR Connect AI virtual assistant. How can I assist you?",
+      options: [],
+      path: "loop",
+    },
+    loop: {
+      message: "",
+      options: async (params) => {
+        const userMessage = params.userInput;
+        let botResponse = "";
+        const urlRegex = /https?:\/\/[^\s]+/;
+
+        try {
+          const response = await fetch(`${API_URL}/api/chat`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: userMessage, sessionId }),
+          });
+
+          const data = await response.json();
+          if (data.error) return data.error;
+          let optionsArr =
+            data
+              .find((val) => val.message == "payload")
+              ?.payload?.fields.options.listValue.values.map(
+                (val) => val.stringValue,
+              ) || [];
+
+          data
+            .filter((val) => val.message == "text")
+            .map((msg) => {
+              botResponse = botResponse + `${msg.text.text[0]}\n`;
+            });
+
+          if (urlRegex.test(botResponse)) {
+            let txt = botResponse.match(urlRegex);
+            let txt2 = botResponse.replace(txt, "");
+            await params.injectMessage(
               <div
-                className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center ${msg.sender === "user" ? "bg-white border border-[#6a008e] text-[#6a008e]" : "bg-[#6a008e] text-white"}`}
+                className="rcb-bot-message rcb-bot-message-entry"
+                style={{
+                  backgroundColor: "rgb(73, 29, 141)",
+                  color: "rgb(255, 255, 255)",
+                  maxWidth: "65%",
+                }}
               >
-                {msg.sender === "user" ? (
-                  <User size={14} />
-                ) : msg.sender === "bot" ? (
-                  <Bot size={14} />
-                ) : msg.sender === "agent" ? (
-                  <Headset size={14} />
-                ) : null}
-              </div>
-              {msg.sender === "system" ? (
-                <div className="p-3 text-sm w-full text-center bg-transparent italic text-slate-400">
-                  {msg.text.join("")}
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <div
-                    className={`p-3 rounded-2xl text-sm ${
-                      msg.sender === "user"
-                        ? "bg-whitesmoke border border-neutral-200 text-neutral-800 rounded-tr-none shadow-sm"
-                        : "bg-[#6a008e] text-white rounded-tl-none"
-                    }`}
-                  >
-                    {msg.text.map((val, ind) => (
-                      <p
-                        key={ind}
-                        className="whitespace-pre-wrap leading-relaxed"
-                      >
-                        {val}
-                      </p>
-                    ))}
-                  </div>
-                  <div
-                    className={`text-[10px] text-neutral-400 px-1 ${msg.sender === "user" ? "text-right" : "text-left"}`}
-                  >
-                    {msg.timestamp.toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                    {msg.source && (
-                      <span className="ml-2 italic">via {msg.source}</span>
-                    )}
-                  </div>
+                <span>{txt2}</span>{" "}
+                <a href={`${txt}`} target="_blank">
+                  {txt}
+                </a>
+              </div>,
+            );
+          } else {
+            await params.injectMessage(botResponse);
+          }
 
-                  {msg.custom_payloads.length > 0 && (
-                    <div className="flex gap-0 md:gap-2 flex-wrap">
-                      {msg.custom_payloads.map((val, ind) => (
-                        <span
-                          key={ind}
-                          className="chip cursor-pointer border border-[#6a008e] shadow-lg hover:bg-gray-200 text-[#6a008e] font-semibold"
-                          onClick={() => handleSend(val.stringValue)}
-                        >
-                          <span className="text-xs md:text-md">
-                            {val.stringValue}
-                          </span>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="flex gap-2 max-w-[80%]">
-              <div className="w-8 h-8 rounded-full bg-[#6a008e] border border-[#6a008e] text-white flex items-center justify-center">
-                <Bot size={14} />
-              </div>
-              <div className="bg-[#6a008e] border border-neutral-200 p-3 rounded-2xl rounded-tl-none shadow-sm">
-                <Loader2 size={16} className="animate-spin text-neutral-400" />
-              </div>
-            </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
+          return optionsArr;
+        } catch (error) {
+          console.error("Chat Error:", error);
+          await params.injectMessage(
+            "Sorry, I'm having trouble connecting to the chat service.",
+          );
+          return [];
+        }
+      },
+      function: (params) => {
+        if (params.userInput == "Submit Leave Request") {
+          updateForm({ user: user.$id, status: "pending" });
+        }
 
-      {/* Input */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSend(input);
-        }}
-        className="p-4 bg-white border-t border-neutral-100 flex gap-2"
-      >
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Type your message..."
-          className="flex-1 bg-neutral-100 border-none rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-[#6a008e] transition-all outline-none"
-        />
-        <button
-          type="submit"
-          disabled={!input.trim() || isLoading}
-          className="bg-neutral-900 text-white p-2 rounded-xl hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
-        >
-          <Send size={18} />
-        </button>
-      </form>
-    </motion.div>
+        if (params.userInput.match("Escalate")) {
+          setIsHumanAgent(true);
+        }
+      },
+      path: (params) => {
+        if (
+          params.userInput.toLowerCase().match("annual leave") &&
+          params.prevPath == "loop"
+        )
+          return "leave_balance";
+        if (
+          params.userInput.toLowerCase().match("sick leave") &&
+          params.prevPath == "loop"
+        )
+          return "leave_balance";
+        if (
+          params.userInput.toLowerCase().match("maternity/paternity leave") &&
+          params.prevPath == "loop"
+        )
+          return "leave_balance";
+        if (params.userInput == "Submit Leave Request") return "book_leave";
+        if (params.userInput.match("Escalate")) return "human_handover";
+        return "loop";
+      },
+    },
+    leave_balance: {
+      message: async (params) => {
+        const userMessage = lowercaseFirstLetter(params.userInput);
+        let botResponse = "";
+
+        try {
+          const { rows } = await searchLeaveBalance({
+            userId: user.$id,
+            leaveType: userMessage,
+          });
+          rows.map((row) => {
+            botResponse =
+              botResponse +
+              `You have ${row.balanceDays} days ${params.userInput} left for the year.\n`;
+          });
+
+          return botResponse;
+        } catch (error) {
+          console.error("Chat Error:", error);
+          return "Sorry, I'm having trouble connecting to the chat service.";
+        }
+      },
+      options: (params) => [`Submit Leave Request`, "Return to Main Menu"],
+      function: (params) => {
+        if (params.userInput == `Submit Leave Request`) {
+          updateForm({ user: user.$id, status: "pending" });
+        }
+      },
+      path: (params) => {
+        if (params.userInput == `Submit Leave Request`) return "book_leave";
+        return "loop";
+      },
+    },
+    book_leave: {
+      message: "Please select from the category below",
+      options: ["Annual Leave", "Sick Leave", "Maternity/Paternity Leave"],
+      function: (params) =>
+        updateForm({ leaveType: lowercaseFirstLetter(params.userInput) }),
+      path: (params) => {
+        if (params.userInput.toLowerCase().match("annual leave"))
+          return "ask_start";
+        if (params.userInput.toLowerCase().match("sick leave"))
+          return "ask_start";
+        if (params.userInput.toLowerCase().match("maternity/paternity leave"))
+          return "ask_start";
+        return "loop";
+      },
+    },
+    ask_start: {
+      message: "Please enter your start date (Format: YYYY-MM-DD)",
+      function: (params) => updateForm({ startDate: params.userInput }),
+      path: async (params) => {
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(params.userInput)) {
+          await params.injectMessage(
+            "Invalid date, please re-enter your start date",
+          );
+          return;
+        }
+        const date = new Date(params.userInput);
+        if (isNaN(date.getTime())) {
+          await params.injectMessage(
+            "Invalid date, please re-enter your start date",
+          );
+          return;
+        }
+        return "ask_end";
+      },
+    },
+    ask_end: {
+      message: "Please enter your end date (Format: YYYY-MM-DD)",
+      function: (params) => updateForm({ endDate: params.userInput }),
+      path: async (params) => {
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(params.userInput)) {
+          await params.injectMessage(
+            "Invalid date, please re-enter your end date",
+          );
+          return;
+        }
+        const date = new Date(params.userInput);
+        if (isNaN(date.getTime())) {
+          await params.injectMessage(
+            "Invalid date, please re-enter your end date",
+          );
+          return;
+        }
+        return "submit_leave";
+      },
+    },
+    submit_leave: {
+      message: async () => {
+        const form = formRef.current;
+        try {
+          await submitLeaveApplication(form);
+          return "Leave application submitted successfully";
+        } catch (error) {
+          console.error("Chat Error:", error);
+          return "Sorry, I'm having trouble connecting to the chat service.";
+        }
+      },
+      options: ["Leave Management", "Return to Main Menu"],
+      path: "loop",
+    },
+    human_handover: {
+      message: async (params) => {
+        socket.on("agent_joined", async () => {
+          console.log("agent_joined");
+          await params.injectMessage("Connected to an agent.. ");
+        });
+
+        socket.on("new_message", async (data) => {
+          console.log("new_message");
+          if (prevMsg.id != data.message.id) {
+            await params.injectMessage(data.message.text);
+          }
+          prevMsg = data.message;
+        });
+      },
+      function: (params) => {
+        socket.emit("send_message", {
+          id: Date.now().toString(),
+          sessionId,
+          text: params.userInput,
+          sender: "user",
+          timestamp: new Date(),
+        });
+      },
+      path: "human_handover",
+    },
+    unknown_input: {
+      message: "I didn't get that. Can you say it again?",
+      options: ["Escalate", "Return to Main Menu"],
+      path: (params) => {
+        if (params.userInput.match("Escalate")) return "human_handover";
+        return "loop";
+      },
+    },
+  };
+
+  const settings = {
+    general: {
+      showIcon: false,
+    },
+    header: {
+      title: (
+        <div className="flex items-center gap-2">
+          <span className="font-semibold">HR Connect</span>
+        </div>
+      ),
+      showAvatar: true,
+      buttons: [
+        <button className="rcb-notification-icon" onClick={restartFlow}>
+          <RefreshCcw className="mx-auto" />
+        </button>,
+        ChatBotton.NOTIFICATION_BUTTON,
+        ChatBotton.CLOSE_CHAT_BUTTON,
+      ],
+    },
+    botBubble: {
+      simStream: true,
+      showAvatar: true,
+    },
+    userBubble: {
+      showAvatar: true,
+      avatar: "/images/no_img.png",
+    },
+    chatButton: {
+      icon: "/images/bot_img.avif",
+    },
+    chatWindow: {
+      showScrollbar: true,
+    },
+    theme: {
+      primaryColor: "#6a008e",
+      //secondaryColor: "#059669",
+    },
+  };
+
+  return (
+    <ChatBotProvider>
+      <ChatBotify flow={flow} settings={settings} />
+    </ChatBotProvider>
   );
 };
 
