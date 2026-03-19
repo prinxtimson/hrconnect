@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { RefreshCcw } from "lucide-react";
 import { useSelector } from "react-redux";
-import { Button } from "primereact/button";
 import { v4 as uuid } from "uuid";
 import ChatBotify, {
   Button as ChatBotton,

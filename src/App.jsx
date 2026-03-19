@@ -95,7 +95,7 @@ const App = () => {
           </Route>
         </Routes>
       </Router>
-      <ChatBot />
+      {isAuthenticated && <ChatBot />}
     </div>
   );
 };
