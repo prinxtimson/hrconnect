@@ -14,7 +14,6 @@ import { searchLeaveBalance, submitLeaveApplication } from "../lib/appwrite";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 const ChatBot = () => {
-  const { restartFlow } = useFlow();
   const [sessionId] = useState(uuid());
   const [isHumanAgent, setIsHumanAgent] = useState(false);
   const formRef = useRef({});
@@ -45,6 +44,10 @@ const ChatBot = () => {
     str = str.replace("/Paternity", "");
     return str.charAt(0).toLowerCase() + str.slice(1);
   }
+
+  const slots = {
+    chatBotHeader: ChatHeader,
+  };
 
   const flow = {
     start: {
@@ -294,13 +297,6 @@ const ChatBot = () => {
         </div>
       ),
       showAvatar: true,
-      buttons: [
-        <button className="rcb-notification-icon" onClick={restartFlow}>
-          <RefreshCcw className="mx-auto" />
-        </button>,
-        ChatBotton.NOTIFICATION_BUTTON,
-        ChatBotton.CLOSE_CHAT_BUTTON,
-      ],
     },
     botBubble: {
       simStream: true,
@@ -324,9 +320,30 @@ const ChatBot = () => {
 
   return (
     <ChatBotProvider>
-      <ChatBotify flow={flow} settings={settings} />
+      <ChatBotify flow={flow} settings={settings} slots={slots} />
     </ChatBotProvider>
   );
 };
 
 export default ChatBot;
+
+const ChatHeader = (props) => {
+  const { restartFlow } = useFlow();
+
+  return (
+    <div className="rcb-chat-header-container bg-[#4f257d]">
+      <div className="rcb-chat-header">
+        <div className="rcb-bot-avatar chat-bg-img"></div>
+        <div className="flex items-center gap-2">
+          <span className="font-semibold">HR Connect</span>
+        </div>
+      </div>
+      <div className="rcb-chat-header">
+        <button className="rcb-notification-icon" onClick={restartFlow}>
+          <RefreshCcw className="mx-auto" />
+        </button>
+        {props.buttons}
+      </div>
+    </div>
+  );
+};

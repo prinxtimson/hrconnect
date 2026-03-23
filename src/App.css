@@ -147,3 +147,7 @@
   margin: 0px 10px 10px 0px;
   padding: 0px 16px;
 }
+
+.chat-bg-img {
+  background-image: url("/images/bot_img.avif");
+}

@@ -7,9 +7,6 @@ const getCurrentUser = async () => {
 };
 
 const logout = async () => {
-  await account.deleteSession({
-    sessionId: "current",
-  });
   createAuditLogs({
     actionType: "access",
     entityType: "Auth",
@@ -17,6 +14,10 @@ const logout = async () => {
     details: "Logout",
     user: account.get().$id,
   });
+  await account.deleteSession({
+    sessionId: "current",
+  });
+
   return;
 };
 
