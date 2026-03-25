@@ -180,7 +180,7 @@ const ChatBot = () => {
       },
     },
     book_leave: {
-      message: "Please select from the category below",
+      message: "Please select from the categories below",
       options: ["Annual Leave", "Sick Leave", "Maternity/Paternity Leave"],
       function: (params) =>
         updateForm({ leaveType: lowercaseFirstLetter(params.userInput) }),
