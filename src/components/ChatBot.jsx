@@ -254,15 +254,6 @@ const ChatBot = () => {
           console.log("agent_joined");
           await params.injectMessage("Connected to an agent... ");
         });
-
-        socket.on("new_message", async (data) => {
-          if (parseInt(data.message.id) === parseInt(prevMsg.id)) {
-            prevMsg = data.message;
-          } else {
-            prevMsg = data.message;
-            await params.injectMessage(data.message.text);
-          }
-        });
       },
       function: (params) => {
         socket.emit("send_message", {
@@ -273,7 +264,17 @@ const ChatBot = () => {
           timestamp: new Date(),
         });
       },
-      path: "human_handover",
+      path: (params) => {
+        socket.on("new_message", async (data) => {
+          if (parseInt(data.message.id) === parseInt(prevMsg.id)) {
+            prevMsg = data.message;
+          } else {
+            prevMsg = data.message;
+            await params.injectMessage(data.message.text);
+          }
+        });
+        return "human_handover";
+      },
     },
     unknown_input: {
       message: "I didn't get that. Can you say it again?",
